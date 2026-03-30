@@ -1,0 +1,5 @@
+tesi2026/
+__pycache__/
+*.pyc
+__MACOSX/
+.DS_Store
