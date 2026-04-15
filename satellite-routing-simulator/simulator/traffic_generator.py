@@ -14,7 +14,7 @@ class TrafficGenerator:
         self.delayed_start = kwargs['delayed_start'] if 'delayed_start' in kwargs else 0
         self.duration = duration
         self.flow = Flow(random.randint(1, 1000000), rate, (self.destination_gs.lat, self.destination_gs.lon))
-        env.put(self.delayed_start, self._begin_generating)
+        env.put(self.delayed_start + 1, self._begin_generating)
         env.put(self.duration, self._end_generating)
         
     def set_source(self, gs: GroundStation):

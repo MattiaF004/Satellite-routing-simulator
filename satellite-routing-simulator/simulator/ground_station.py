@@ -65,15 +65,19 @@ class GroundStation:
         return self.name
 
     #sender of flows from GS to connected satellite
-    def send_flow(self, flow: Flow, routing_decisions=None): #optional parameter routing_decisions
+    def send_flow(self, flow: Flow, routing_decisions=None):
+        if self.sat is None:
+            print(f"[WARNING] GS {self.get_name()} has no satellite attached, dropping flow {flow.id}")
+            return
         self.outgoing_flows.append((flow, utils.get_current_time(), None))
         if constants.DEBUG:
             print("----- [OPENING FLOW] on GS", flow, "with ID", flow.id, "alias_ID", flow.alias_id, "from", self.get_name().upper(), "with Rate", flow.rate)
         flow.travelled_distance += utils.get_distance_between_satellite_and_gs(self.sat, self)
         if routing_decisions != None:
-            self.sat.open_flow(flow.clone(), routing_decisions) #Port Forwarding branch
+            self.sat.open_flow(flow.clone(), routing_decisions)
         else:
             self.sat.open_flow(flow.clone())
+   
 
     #close the outgoing flows
     def close_outgoing_flow(self, flow: Flow):

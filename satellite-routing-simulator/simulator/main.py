@@ -6,6 +6,7 @@ import environment as env
 from itertools import chain
 import json
 import matplotlib.pyplot as plt
+
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import numpy as np
@@ -90,10 +91,9 @@ satellites = {int(sat.name[-3:]) : Sat(sat, ground_stations) for sat in load.tle
 print('Loaded', len(satellites), 'satellites.')
 for gs in ground_stations.values():
     gs.set_satellites(satellites)
+    env.satellites = satellites
+    env.ground_stations = ground_stations
 
-env.satellites = satellites
-env.ground_stations = ground_stations
-env.prepare()
 
 # Start of the code block that launches the standard simulation
 traffic_generators = []
@@ -110,6 +110,8 @@ if constants.ROUTING_STRATEGY in [Strategy.BASELINE_DIJKSTRA,
     for gs in ground_stations.values():
         gs_traffic_details = traffic_matrix[gs.get_name()]
         for destination in gs_traffic_details:
+            if destination.upper() == gs.get_name().upper():
+                continue
             hb = HeaderBuilder(gs_traffic_details[destination], constants.SIMULATION_DURATION, gss=ground_stations, source_gs=gs, destination_gs=ground_stations[destination.upper()])
             header_builders.append(hb)
 
@@ -124,8 +126,11 @@ if constants.ROUTING_STRATEGY in [Strategy.POSITION_GUESSING_NO_LB,
     for gs in ground_stations.values():
         gs_traffic_details = traffic_matrix[gs.get_name()]
         for destination in gs_traffic_details:
+            if destination.upper() == gs.get_name().upper():
+                continue
             tg = TrafficGenerator(gs_traffic_details[destination], constants.SIMULATION_DURATION, source_gs=gs, destination_gs=ground_stations[destination.upper()])
             traffic_generators.append(tg)
+env.prepare()
 env.start()
 # End of block
 
@@ -163,4 +168,4 @@ traffic_analyzer = TrafficAnalyzer(ground_stations, satellites)
 #show_constellation_map([], ground_stations.values(), links=[], paths=[])
 
 #Print the GS & satellites positions
-#show_constellation_map(satellites.values(), ground_stations.values(), links=[], paths=[])
+#   show_constellation_map(satellites.values(), ground_stations.values(), links=[], paths=[])

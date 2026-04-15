@@ -297,14 +297,14 @@ class Sat:
         def get_nodes_to_be_excluded_from_next_hop_candidates(flow) -> list:
             if constants.LOOP_AVOIDANCE_CUTOFF == 0:
                 return []
-            else:
-                steps = flow.get_steps() if len(flow.get_steps()) < constants.LOOP_AVOIDANCE_CUTOFF else flow.get_steps()[-constants.LOOP_AVOIDANCE_CUTOFF:]
-                if steps and steps[-1] == self:
-                    steps = steps[:-1]
-                indices = [i+1 for i, x in enumerate(steps) if x == self]
-                if len(steps) > 0:
-                    indices.append(-1)
-                return [steps[i] for i in indices if 0 <= i < len(steps)]
+            steps = flow.get_steps()
+            if steps and steps[-1] == self:
+                steps = steps[:-1]
+            seen = []
+            for s in steps[-constants.LOOP_AVOIDANCE_CUTOFF:]:
+                if s not in seen:
+                    seen.append(s)
+            return seen
 
         routing_output = list()
         distance_from_destination = distance.distance((self.get_latitude(), self.get_longitude()), flow.destination).km

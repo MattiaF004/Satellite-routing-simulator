@@ -205,9 +205,28 @@ def update_satellites_position():
     for gs in env.ground_stations.values():
         gs.reattach() #reattach with GS
 
+
+
+#new function to get closer satellites to a position (used for graph creation)----------------------------------------------------------
+def angular_diff(lon1, lon2):
+    diff = lon2 - lon1
+    if diff > 180:
+        diff -= 360
+    if diff < -180:
+        diff += 360
+    return diff
+
+#----------------------------------------------------------------------------------------------------------------------------------------
+
+
 #topology builder
 def topology_builder():
     update_satellites_position()
+    #debug code-----------------------------------------------------------
+    for key, sat in env.satellites.items():
+        if key in [146, 149, 152, 164]:
+            print(f"SAT {key}: lat={sat.get_latitude():.2f}, lon={sat.get_longitude():.2f}")
+    #
     temp_satellites = {}
     for key, sat in env.satellites.items():
         temp_satellites[key] = [sat.get_latitude(),
@@ -242,21 +261,36 @@ def topology_builder():
         sat = temp_satellites.get(key)
         sat_link = temp_satellites.get(sat_key)
 
-        #check if sat & sat_link are close enough to create a link (+/- 7 degrees of longitude & +/- 173 degrees on international line of Date change)
-        if sat[1] + 7 > sat_link[1] and sat[1] - 7 < sat_link[1] or sat[1] < -173 and sat_link[1] > 173 or sat[1] > 173 and sat_link[1] < -173:
-            if sat[0] < sat_link[0] and sat[2] == None and sat_link[3] == None: #North branch
+        #new ccode----------------------------------------------------------------------------------------------------------------------------------------------------
+        lon_diff = abs(angular_diff(sat[1], sat_link[1]))
+        same_plane = lon_diff < 7
+
+        if same_plane:
+            if sat[0] < sat_link[0] and sat[2] is None and sat_link[3] is None:  # North branch
                 sat[2] = sat_key
                 sat_link[3] = key
-            elif sat[0] > sat_link[0] and sat[3] == None and sat_link[2] == None: #South branch
+            elif sat[0] > sat_link[0] and sat[3] is None and sat_link[2] is None:  # South branch
                 sat[3] = sat_key
                 sat_link[2] = key
-        #else check if the source satellite (sat) is at a lower longitude (so it's at EAST respect to sat_link) 
-        elif (sat[1] < sat_link[1] or sat[1] > 150 and sat_link[1] < -150 and sat[1] > sat_link[1]) and sat[4] == None and sat_link[5] == None: #East branch
+        else:
+            diff = angular_diff(sat[1], sat_link[1])
+            if diff > 0 and sat[4] is None and sat_link[5] is None:  # East branch
                 sat[4] = sat_key
                 sat_link[5] = key
-        elif (sat[1] > sat_link[1] or sat[1] < -150 and sat_link[1] > 150 and sat[1] < sat_link[1]) and sat[5] == None and sat_link[4] == None: #West branch
+            elif diff < 0 and sat[5] is None and sat_link[4] is None:  # West branch
                 sat[5] = sat_key
                 sat_link[4] = key
+
+
+        #-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+        
+        #old code
+        #elif (sat[1] < sat_link[1] or sat[1] > 150 and sat_link[1] < -150 and sat[1] > sat_link[1]) and sat[4] == None and sat_link[5] == None: #East branch
+         #       sat[4] = sat_key
+          #      sat_link[5] = key
+       # elif (sat[1] > sat_link[1] or sat[1] < -150 and sat_link[1] > 150 and sat[1] < sat_link[1]) and sat[5] == None and sat_link[4] == None: #West branch
+         #       sat[5] = sat_key
+        #        sat_link[4] = key
            
     if constants.DEBUG:
         print("Linking phase completed. Applying...")
