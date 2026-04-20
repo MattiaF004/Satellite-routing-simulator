@@ -275,10 +275,10 @@ def topology_builder():
         else:
             diff = angular_diff(sat[1], sat_link[1])
             # Prevent connecting to the same satellite in both East and West directions
-            if diff > 0 and sat[4] is None and sat_link[5] is None and sat_link[4] is None:  # East branch
+            if diff > 0 and sat[4] is None and sat_link[5] is None :  # East branch
                 sat[4] = sat_key
                 sat_link[5] = key
-            elif diff < 0 and sat[5] is None and sat_link[4] is None and sat_link[5] is None:  # West branch
+            elif diff < 0 and sat[5] is None and sat_link[4] is None :  # West branch
                 sat[5] = sat_key
                 sat_link[4] = key
 

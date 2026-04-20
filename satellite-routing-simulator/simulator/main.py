@@ -7,6 +7,8 @@ from itertools import chain
 import json
 import matplotlib.pyplot as plt
 
+from flow import Flow
+
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import numpy as np
@@ -16,7 +18,7 @@ from skyfield.api import load
 from traffic_analyzer import AnalysisMetric, TrafficAnalyzer
 from header_builder import HeaderBuilder
 from traffic_generator import TrafficGenerator
-import utils
+import utils 
 from strategy import Strategy
 from itertools import chain
 
@@ -27,6 +29,24 @@ sys.setrecursionlimit(10000)
 def read_from_json(filename):
     with open(f'{filename}.json', 'r', encoding='utf-8') as f:
         return json.load(f)
+    
+#new function
+def _close_loopback(flow, gs):
+    current_time = utils.get_current_time()
+    for i, (f, start, end) in enumerate(gs.outgoing_flows):
+        if f == flow and end is None:
+            gs.outgoing_flows[i] = (f, start, current_time)
+            break
+    for i, (f, start, end) in enumerate(gs.incoming_flows):
+        if f == flow and end is None:
+            gs.incoming_flows[i] = (f, start, current_time)
+            break
+
+
+def _register_loopback(flow, gs):
+    start_time = utils.get_current_time()
+    gs.outgoing_flows.append((flow, start_time, None))
+    gs.incoming_flows.append((flow, start_time, None))
 
 # Constellation map generation
 def show_constellation_map(satellites: list, ground_stations: list, **kwargs):
@@ -99,6 +119,7 @@ for gs in ground_stations.values():
 traffic_generators = []
 header_builders = []
 
+registered_loopbacks = set()
 if constants.ROUTING_STRATEGY in [Strategy.BASELINE_DIJKSTRA,
                                   Strategy.SOURCE_ROUTING_BY_HOP_NO_LB,
                                   Strategy.SOURCE_ROUTING_BY_LENGTH_NO_LB,
@@ -111,10 +132,20 @@ if constants.ROUTING_STRATEGY in [Strategy.BASELINE_DIJKSTRA,
         gs_traffic_details = traffic_matrix[gs.get_name()]
         for destination in gs_traffic_details:
             if destination.upper() == gs.get_name().upper():
+                if gs.get_name() not in registered_loopbacks:
+                    registered_loopbacks.add(gs.get_name())
+                    loopback_flow = Flow(
+                        random.randint(1, 1000000),
+                        gs_traffic_details[destination],
+                        (gs.lat, gs.lon)
+                    )
+                    env.put(1, lambda f=loopback_flow, g=gs: _register_loopback(f, g))
+                    env.put(constants.SIMULATION_DURATION, lambda f=loopback_flow, g=gs: _close_loopback(f, g))
                 continue
             hb = HeaderBuilder(gs_traffic_details[destination], constants.SIMULATION_DURATION, gss=ground_stations, source_gs=gs, destination_gs=ground_stations[destination.upper()])
             header_builders.append(hb)
 
+registered_loopbacks = set()
 if constants.ROUTING_STRATEGY in [Strategy.POSITION_GUESSING_NO_LB,
                                   Strategy.POSITION_GUESSING_LB_ON_SATURATED_LINK,
                                   Strategy.POSITION_GUESSING_PROGRESSIVE_LB,
@@ -127,6 +158,15 @@ if constants.ROUTING_STRATEGY in [Strategy.POSITION_GUESSING_NO_LB,
         gs_traffic_details = traffic_matrix[gs.get_name()]
         for destination in gs_traffic_details:
             if destination.upper() == gs.get_name().upper():
+                if gs.get_name() not in registered_loopbacks:
+                    registered_loopbacks.add(gs.get_name())
+                    loopback_flow = Flow(
+                        random.randint(1, 1000000),
+                        gs_traffic_details[destination],
+                        (gs.lat, gs.lon)
+                    )
+                    env.put(1, lambda f=loopback_flow, g=gs: _register_loopback(f, g))
+                    env.put(constants.SIMULATION_DURATION, lambda f=loopback_flow, g=gs: _close_loopback(f, g))
                 continue
             tg = TrafficGenerator(gs_traffic_details[destination], constants.SIMULATION_DURATION, source_gs=gs, destination_gs=ground_stations[destination.upper()])
             traffic_generators.append(tg)

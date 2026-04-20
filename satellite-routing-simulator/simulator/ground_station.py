@@ -92,7 +92,8 @@ class GroundStation:
         else:
             while self.outgoing_flows.__contains__(flow):
                 self.outgoing_flows.remove(flow)
-        self.sat.close_flow(flow.clone())
+        if self.sat is not None:
+            self.sat.close_flow(flow.clone())
 
     def close_remaining_flows(self):
         def remove_ongoing(flows):
