@@ -222,9 +222,9 @@ def angular_diff(lon1, lon2):
 #topology builder
 def topology_builder():
     update_satellites_position()
-    #debug code-----------------------------------------------------------
+    #debug code-------------------------------------------------------------------------------------------------------------------------------
     for key, sat in env.satellites.items():
-        if key in [146, 149, 152, 164]:
+        if key in [146, 149, 152, 164, 119, 160]:
             print(f"SAT {key}: lat={sat.get_latitude():.2f}, lon={sat.get_longitude():.2f}")
     #
     temp_satellites = {}
@@ -274,10 +274,11 @@ def topology_builder():
                 sat_link[2] = key
         else:
             diff = angular_diff(sat[1], sat_link[1])
-            if diff > 0 and sat[4] is None and sat_link[5] is None:  # East branch
+            # Prevent connecting to the same satellite in both East and West directions
+            if diff > 0 and sat[4] is None and sat_link[5] is None and sat_link[4] is None:  # East branch
                 sat[4] = sat_key
                 sat_link[5] = key
-            elif diff < 0 and sat[5] is None and sat_link[4] is None:  # West branch
+            elif diff < 0 and sat[5] is None and sat_link[4] is None and sat_link[5] is None:  # West branch
                 sat[5] = sat_key
                 sat_link[4] = key
 
