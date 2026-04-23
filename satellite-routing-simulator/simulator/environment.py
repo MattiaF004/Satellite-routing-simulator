@@ -216,6 +216,24 @@ def angular_diff(lon1, lon2):
         diff += 360
     return diff
 
+
+def los_between_satellites(sat_u, sat_v):
+    import math
+    pos_u = sat_u.get_position_km()
+    pos_v = sat_v.get_position_km()
+
+    dot_uu = sum(p*p for p in pos_u)
+    dot_vv = sum(p*p for p in pos_v)
+    dot_uv = sum(p*q for p, q in zip(pos_u, pos_v))
+
+    num = dot_uu * dot_vv - dot_uv ** 2
+    den = dot_uu + dot_vv - 2 * dot_uv
+
+    if den == 0:
+        return False
+
+    return math.sqrt(abs(num / den)) - 6378.14 > 0
+
 #----------------------------------------------------------------------------------------------------------------------------------------
 
 
@@ -255,15 +273,35 @@ def topology_builder():
             distances.append({'distance': dist, 'sat1': key, 'sat2': key_link})
     distances.sort(key=lambda x: x['distance'])
     
+    skipped_by_los = 0  
+
     for dist in distances:
         key = dist['sat1']
         sat_key = dist['sat2']
         sat = temp_satellites.get(key)
         sat_link = temp_satellites.get(sat_key)
 
+        #CHECK LOS
+        if constants.TOPOLOGY_STRATEGY == "LOS":
+            sat_obj = satellites.get(key)
+            sat_link_obj = satellites.get(sat_key)
+            if sat_obj and sat_link_obj and not los_between_satellites(sat_obj, sat_link_obj):
+                skipped_by_los += 1
+                continue
+    
+        
+
         #new ccode----------------------------------------------------------------------------------------------------------------------------------------------------
         lon_diff = abs(angular_diff(sat[1], sat_link[1]))
         same_plane = lon_diff < 7
+
+        # Recupera gli oggetti Sat reali per il check LOS
+        sat_obj = env.satellites.get(key)
+        sat_link_obj = env.satellites.get(sat_key)
+
+        if constants.TOPOLOGY_STRATEGY == "LOS":
+            if not los_between_satellites(sat_obj, sat_link_obj):
+                continue  # salta questo link, non c'è visibilità
 
         if same_plane:
             if sat[0] < sat_link[0] and sat[2] is None and sat_link[3] is None:  # North branch
@@ -292,7 +330,10 @@ def topology_builder():
        # elif (sat[1] > sat_link[1] or sat[1] < -150 and sat_link[1] > 150 and sat[1] < sat_link[1]) and sat[5] == None and sat_link[4] == None: #West branch
          #       sat[5] = sat_key
         #        sat_link[4] = key
-           
+    
+    print(f"[LOS] Link scartati per mancanza di visibilità: {skipped_by_los}")
+
+
     if constants.DEBUG:
         print("Linking phase completed. Applying...")
 

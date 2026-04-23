@@ -86,6 +86,12 @@ class Sat:
     def get_longitude(self):
         return self._lon
     
+
+    def get_position_km(self):
+        return self._position_km
+
+
+    
     def store_flow_direction(self, flow: Flow, link: Link):
         if flow.alias_id not in self.flows.keys():
             self.flows[flow.alias_id] = (flow, link)
@@ -162,6 +168,7 @@ class Sat:
         lat, lon = wgs84.latlon_of(geocentric)
         self._lat = lat.degrees 
         self._lon = lon.degrees
+        self._position_km = geocentric.position.km
         
         if constants.ROUTING_STRATEGY in [Strategy.POSITION_GUESSING_NO_LB,
                                           Strategy.POSITION_GUESSING_LB_ON_SATURATED_LINK,
