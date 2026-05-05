@@ -268,8 +268,13 @@ def topology_builder():
             if sat_link[0] > constants.LATITUDE_CUTOFF or sat_link[0] < -constants.LATITUDE_CUTOFF: #if out of area of interest then skip
                 continue
             dist = distance.distance((sat_link[0], sat_link[1]), (sat[0], sat[1])).km
-            if dist > 5100: 
-                continue
+            #LOS
+            if constants.TOPOLOGY_STRATEGY == "LOS":
+                if dist > 6500:
+                    continue
+            else:  # MIN_DISTANCE
+                if dist > 5100:
+                    continue
             distances.append({'distance': dist, 'sat1': key, 'sat2': key_link})
     distances.sort(key=lambda x: x['distance'])
     
@@ -280,14 +285,13 @@ def topology_builder():
         sat_key = dist['sat2']
         sat = temp_satellites.get(key)
         sat_link = temp_satellites.get(sat_key)
-
-        #CHECK LOS
         if constants.TOPOLOGY_STRATEGY == "LOS":
-            sat_obj = satellites.get(key)
-            sat_link_obj = satellites.get(sat_key)
+            sat_obj = env.satellites.get(key)
+            sat_link_obj = env.satellites.get(sat_key)
             if sat_obj and sat_link_obj and not los_between_satellites(sat_obj, sat_link_obj):
                 skipped_by_los += 1
                 continue
+        
     
         
 
@@ -295,13 +299,6 @@ def topology_builder():
         lon_diff = abs(angular_diff(sat[1], sat_link[1]))
         same_plane = lon_diff < 7
 
-        # Recupera gli oggetti Sat reali per il check LOS
-        sat_obj = env.satellites.get(key)
-        sat_link_obj = env.satellites.get(sat_key)
-
-        if constants.TOPOLOGY_STRATEGY == "LOS":
-            if not los_between_satellites(sat_obj, sat_link_obj):
-                continue  # salta questo link, non c'è visibilità
 
         if same_plane:
             if sat[0] < sat_link[0] and sat[2] is None and sat_link[3] is None:  # North branch
@@ -331,7 +328,7 @@ def topology_builder():
          #       sat[5] = sat_key
         #        sat_link[4] = key
     
-    print(f"[LOS] Link scartati per mancanza di visibilità: {skipped_by_los}")
+    print(f"[LOS] Link scartati per mancanza di visibilità: {skipped_by_los // 2}")
 
 
     if constants.DEBUG:
