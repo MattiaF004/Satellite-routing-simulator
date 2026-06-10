@@ -23,7 +23,7 @@ K_SHORTEST_VALUE = 1 #constant k value for shortest path algorithm without load 
 K_SHORTEST_VALUE_LB = 4 #constant that decides how many disjoint paths should be found by k shortest algorithm with load balancing
 
 
-TOPOLOGY_STRATEGY = "LOS" # oppure "MIN_DISTANCE"
+TOPOLOGY_STRATEGY = "LOS" # LOS oppure "MIN_DISTANCE"
 
 parser = argparse.ArgumentParser(prefix_chars='-')
 parser.add_argument("-s", "--strategy", type=int)

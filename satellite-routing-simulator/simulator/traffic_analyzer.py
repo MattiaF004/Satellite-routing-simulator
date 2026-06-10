@@ -230,8 +230,12 @@ class TrafficAnalyzer:
         if constants.SIMULATION_DURATION >= 60:
             filename = utils.randomword(10)
             print("Storing result in file named", filename)
+            output = {
+                '_topology_stats': env.topology_stats,   # ← aggiunta
+                'results': self.results
+            }
             with open(filename + '.json', 'w', encoding='utf-8') as f:
-                json.dump(self.results, f, ensure_ascii=False, indent=4)
+                json.dump(output, f, ensure_ascii=False, indent=4)
 
         return self.results
 

@@ -33,6 +33,7 @@ actions_queue = PriorityQueue()
 ready = False
 elapsed_time = 0
 control_traffic_data = 0 
+topology_stats = {} #aggiunto var. globale
 
 def put(time, function, **kwargs):
     env.actions_queue.put(time, function, **kwargs)
@@ -374,10 +375,29 @@ def topology_builder():
                     available_bandwidth=constants.GROUND_STATION_LINK_CAPACITY
                 )
 
-    num_nodes = env.main_graph.number_of_nodes()
-    num_edges = env.main_graph.number_of_edges()
-    edges_list = [f"{u} <-> {v} {data.get('available_bandwidth', 'N/A')}" for u, v, data in env.main_graph.edges(data=True)]
-    #print(f"[DEBUG] Main Graph: {num_edges} Edges, {num_nodes} Nodes in graph: {edges_list}")
+    # ---- statistiche topologia ----
+    import statistics as _stats
+
+    isl_edges = [(u, v, d) for u, v, d in env.main_graph.edges(data=True)
+                 if d.get('available_bandwidth') == constants.SATELLITE_LINK_CAPACITY]
+    isl_lengths = [d['weight'] for _, _, d in isl_edges]
+
+    env.topology_stats = {
+        'strategy':           constants.TOPOLOGY_STRATEGY,
+        'num_isl_links':      len(isl_edges),
+        'avg_isl_length_km':  round(_stats.mean(isl_lengths), 2) if isl_lengths else 0,
+        'min_isl_length_km':  round(min(isl_lengths), 2) if isl_lengths else 0,
+        'max_isl_length_km':  round(max(isl_lengths), 2) if isl_lengths else 0,
+        'los_discarded':      skipped_by_los // 2,
+        'num_nodes':          env.main_graph.number_of_nodes(),
+        'num_total_edges':    env.main_graph.number_of_edges(),
+    }
+
+    print(f"[TOPOLOGY] strategy={env.topology_stats['strategy']} | "
+          f"ISL links={env.topology_stats['num_isl_links']} | "
+          f"avg length={env.topology_stats['avg_isl_length_km']} km | "
+          f"LOS discarded={env.topology_stats['los_discarded']}")
+    print("Applied. Main graph successfully updated by topology_builder.")
     
     print("Applied. Main graph successfully updated by topology_builder.")
    
