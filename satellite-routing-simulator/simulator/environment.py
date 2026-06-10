@@ -204,6 +204,9 @@ def update_satellites_position():
         sat._update_gs_link() #update link to GS 
     for gs in env.ground_stations.values():
         gs.reattach() #reattach with GS
+    
+
+    
 
 
 
@@ -242,7 +245,7 @@ def topology_builder():
     update_satellites_position()
     #debug code-------------------------------------------------------------------------------------------------------------------------------
     for key, sat in env.satellites.items():
-        if key in [146, 149, 152, 164, 119, 160]:
+        if key in [133, 152, 147, 100, 120, 158]:
             print(f"SAT {key}: lat={sat.get_latitude():.2f}, lon={sat.get_longitude():.2f}")
     #
     temp_satellites = {}
@@ -270,7 +273,7 @@ def topology_builder():
             dist = distance.distance((sat_link[0], sat_link[1]), (sat[0], sat[1])).km
             #LOS
             if constants.TOPOLOGY_STRATEGY == "LOS":
-                if dist > 6500:
+                if dist > 6490:
                     continue
             else:  # MIN_DISTANCE
                 if dist > 5100:
