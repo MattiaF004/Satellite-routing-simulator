@@ -215,8 +215,33 @@ class GroundStation:
                 self.DEBUG_dropped_incoming_flows.remove(flow)
 
     def reattach(self):
-        distances = utils.get_closer_satellites(self.satellites, (self.lat, self.lon), False)
-        new_sat = self.satellites.get(distances[0]['name'])
+        if constants.TOPOLOGY_STRATEGY == "LOS":
+            # Mantieni il satellite attuale se ancora sopra l'orizzonte (LOS valido)
+            if self.sat is not None:
+                from skyfield.api import wgs84 as _wgs84
+                gs_pos = _wgs84.latlon(self.lat, self.lon)
+                difference = (self.sat._earth_satellite - gs_pos).at(utils.get_current_time())
+                alt, _, _ = difference.altaz()
+                if alt.degrees > 0:
+                    return  # satellite corrente ancora visibile, non cambiare
+            # Satellite sceso sotto l'orizzonte (o nessun satellite): cerca il più vicino sopra orizzonte
+            from skyfield.api import wgs84 as _wgs84
+            gs_pos = _wgs84.latlon(self.lat, self.lon)
+            best_sat = None
+            best_dist = float('inf')
+            for key, sat in self.satellites.items():
+                difference = (sat._earth_satellite - gs_pos).at(utils.get_current_time())
+                alt, _, slant = difference.altaz()
+                if alt.degrees > 0 and slant.km < best_dist:
+                    best_dist = slant.km
+                    best_sat = sat
+            if best_sat is None:
+                return  # nessun satellite visibile, non cambiare
+            new_sat = best_sat
+        else:  # MIN_DISTANCE: sempre il più vicino
+            distances = utils.get_closer_satellites(self.satellites, (self.lat, self.lon), False)
+            new_sat = self.satellites.get(distances[0]['name'])
+
         if constants.DEBUG:
             if new_sat != self.sat:
                 print("Attaching Ground Station", self.get_name(), "to Satellite", new_sat.get_name(), "at time", utils.get_current_time().utc_strftime())

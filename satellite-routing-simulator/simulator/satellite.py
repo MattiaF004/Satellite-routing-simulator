@@ -150,9 +150,18 @@ class Sat:
     def _update_gs_link(self):
         gs_candidates = []
         for gs in self._ground_stations.values():
-            distance_from_destination = distance.distance((self.get_latitude(), self.get_longitude()), (gs.lat, gs.lon)).km
-            if distance_from_destination < constants.SATELLITE_COVERAGE_AREA_RADIUS:
-                gs_candidates.append(gs)
+            if constants.TOPOLOGY_STRATEGY == "LOS":
+                # Elevazione angolare reale: il satellite deve essere sopra l'orizzonte della GS
+                from skyfield.api import wgs84 as _wgs84
+                gs_pos = _wgs84.latlon(gs.lat, gs.lon)
+                difference = (self._earth_satellite - gs_pos).at(utils.get_current_time())
+                alt, _, _ = difference.altaz()
+                if alt.degrees > 0:
+                    gs_candidates.append(gs)
+            else:  # MIN_DISTANCE
+                dist = distance.distance((self.get_latitude(), self.get_longitude()), (gs.lat, gs.lon)).km
+                if dist < constants.SATELLITE_COVERAGE_AREA_RADIUS:
+                    gs_candidates.append(gs)
         if set(gs_candidates) != set(self._gs_link.get_attached_gs()):
             leftovers = self._gs_link.detach_from_all()
             for gs in gs_candidates:

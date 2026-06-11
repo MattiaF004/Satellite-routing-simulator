@@ -34,6 +34,8 @@ ready = False
 elapsed_time = 0
 control_traffic_data = 0 
 topology_stats = {} #aggiunto var. globale
+previous_temp_satellites = {}
+
 
 def put(time, function, **kwargs):
     env.actions_queue.put(time, function, **kwargs)
@@ -281,59 +283,81 @@ def topology_builder():
                     continue
             distances.append({'distance': dist, 'sat1': key, 'sat2': key_link})
     distances.sort(key=lambda x: x['distance'])
-    
-    skipped_by_los = 0  
 
-    for dist in distances:
-        key = dist['sat1']
-        sat_key = dist['sat2']
-        sat = temp_satellites.get(key)
-        sat_link = temp_satellites.get(sat_key)
-        if constants.TOPOLOGY_STRATEGY == "LOS":
+    skipped_by_los = 0
+
+    def _try_assign_link(sat, sat_link, key, sat_key):
+        lon_diff = abs(angular_diff(sat[1], sat_link[1]))
+        same_plane = lon_diff < 7
+        if same_plane:
+            if sat[0] < sat_link[0] and sat[2] is None and sat_link[3] is None:
+                sat[2] = sat_key
+                sat_link[3] = key
+                return True
+            elif sat[0] > sat_link[0] and sat[3] is None and sat_link[2] is None:
+                sat[3] = sat_key
+                sat_link[2] = key
+                return True
+        else:
+            diff = angular_diff(sat[1], sat_link[1])
+            if diff > 0 and sat[4] is None and sat_link[5] is None:
+                sat[4] = sat_key
+                sat_link[5] = key
+                return True
+            elif diff < 0 and sat[5] is None and sat_link[4] is None:
+                sat[5] = sat_key
+                sat_link[4] = key
+                return True
+        return False
+
+    if constants.TOPOLOGY_STRATEGY == "LOS":
+        # FASE 1 – mantieni i link precedenti se ancora in LOS
+        for key, prev in env.previous_temp_satellites.items():
+            sat = temp_satellites.get(key)
+            if sat is None:
+                continue
+            # itera sulle 4 direzioni: N=2, S=3, E=4, W=5
+            for slot in [2, 3, 4, 5]:
+                prev_neighbor = prev[slot]
+                if prev_neighbor is None:
+                    continue
+                if sat[slot] is not None:          # già assegnato in questa fase
+                    continue
+                sat_link = temp_satellites.get(prev_neighbor)
+                if sat_link is None:
+                    continue
+                # verifica LOS ancora valido
+                sat_obj = env.satellites.get(key)
+                sat_link_obj = env.satellites.get(prev_neighbor)
+                if sat_obj and sat_link_obj and los_between_satellites(sat_obj, sat_link_obj):
+                    # mantieni il link precedente
+                    _try_assign_link(sat, sat_link, key, prev_neighbor)
+                else:
+                    skipped_by_los += 1
+
+        # FASE 2 – assegna nuovi link per slot ancora vuoti (minima distanza tra candidati in LOS)
+        for dist in distances:
+            key = dist['sat1']
+            sat_key = dist['sat2']
+            sat = temp_satellites.get(key)
+            sat_link = temp_satellites.get(sat_key)
+            # salta se il candidato non è in LOS
             sat_obj = env.satellites.get(key)
             sat_link_obj = env.satellites.get(sat_key)
             if sat_obj and sat_link_obj and not los_between_satellites(sat_obj, sat_link_obj):
                 skipped_by_los += 1
                 continue
-        
-    
-        
+            _try_assign_link(sat, sat_link, key, sat_key)
 
-        #new ccode----------------------------------------------------------------------------------------------------------------------------------------------------
-        lon_diff = abs(angular_diff(sat[1], sat_link[1]))
-        same_plane = lon_diff < 7
+    else:  # MIN_DISTANCE: sempre il più vicino, nessun mantenimento
+        for dist in distances:
+            key = dist['sat1']
+            sat_key = dist['sat2']
+            sat = temp_satellites.get(key)
+            sat_link = temp_satellites.get(sat_key)
+            _try_assign_link(sat, sat_link, key, sat_key)
 
-
-        if same_plane:
-            if sat[0] < sat_link[0] and sat[2] is None and sat_link[3] is None:  # North branch
-                sat[2] = sat_key
-                sat_link[3] = key
-            elif sat[0] > sat_link[0] and sat[3] is None and sat_link[2] is None:  # South branch
-                sat[3] = sat_key
-                sat_link[2] = key
-        else:
-            diff = angular_diff(sat[1], sat_link[1])
-            # Prevent connecting to the same satellite in both East and West directions
-            if diff > 0 and sat[4] is None and sat_link[5] is None :  # East branch
-                sat[4] = sat_key
-                sat_link[5] = key
-            elif diff < 0 and sat[5] is None and sat_link[4] is None :  # West branch
-                sat[5] = sat_key
-                sat_link[4] = key
-
-
-        #-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
-        
-        #old code
-        #elif (sat[1] < sat_link[1] or sat[1] > 150 and sat_link[1] < -150 and sat[1] > sat_link[1]) and sat[4] == None and sat_link[5] == None: #East branch
-         #       sat[4] = sat_key
-          #      sat_link[5] = key
-       # elif (sat[1] > sat_link[1] or sat[1] < -150 and sat_link[1] > 150 and sat[1] < sat_link[1]) and sat[5] == None and sat_link[4] == None: #West branch
-         #       sat[5] = sat_key
-        #        sat_link[4] = key
-    
     print(f"[LOS] Link scartati per mancanza di visibilità: {skipped_by_los // 2}")
-
 
     if constants.DEBUG:
         print("Linking phase completed. Applying...")
@@ -398,7 +422,8 @@ def topology_builder():
           f"avg length={env.topology_stats['avg_isl_length_km']} km | "
           f"LOS discarded={env.topology_stats['los_discarded']}")
     print("Applied. Main graph successfully updated by topology_builder.")
-    
+    # salva snapshot per il prossimo ciclo LOS
+    env.previous_temp_satellites = {k: list(v) for k, v in temp_satellites.items()}
     print("Applied. Main graph successfully updated by topology_builder.")
    
 def log_control_traffic_message(bytes: int):
