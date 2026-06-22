@@ -60,6 +60,8 @@ class GroundStation:
                 self.sat.serving_gs = None
             self.sat = sat
             self.sat.serving_gs = self
+            for flow in backup_flows:
+                self.send_flow(flow)   # riapre il flusso sul nuovo satellite
 
     def get_name(self) -> str:
         return self.name
